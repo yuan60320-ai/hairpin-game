@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>簪子解谜 · 原创版</title>
+<style>
+  :root { --ink:#2b2320; --paper:#fbf6ee; --line:#e6dccb; --accent:#b5835a; --leaf:#4f7f5e; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:#efe7d8; color:var(--ink); font:14px/1.45 "Microsoft YaHei","Segoe UI",Arial,sans-serif; }
+  .layout { width:min(980px,calc(100% - 32px)); margin:24px auto; display:grid; grid-template-columns:minmax(300px,380px) 1fr; gap:28px; align-items:start; }
+  .stage { display:flex; flex-direction:column; align-items:center; gap:10px; }
+  #game { width:100%; max-width:380px; aspect-ratio:2/3; border-radius:18px; box-shadow:0 14px 36px #5a421c33; touch-action:none; cursor:grab; }
+  #game:active { cursor:grabbing; }
+  .status { min-height:22px; font-weight:700; color:var(--accent); text-align:center; }
+  .panel { background:var(--paper); border:1px solid var(--line); border-radius:16px; padding:18px 20px; }
+  .panel h2 { margin:14px 0 8px; font-size:14px; color:var(--leaf); }
+  .panel h2:first-child { margin-top:0; }
+  .row { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:8px 0; }
+  .row label { flex:1; color:#5b4d43; }
+  .row input[type=range] { flex:1.4; accent-color:var(--leaf); }
+  .row input[type=checkbox] { accent-color:var(--leaf); }
+  .row output { min-width:44px; text-align:right; color:var(--leaf); font-weight:700; }
+  select, input[type=color] { font:inherit; border:1px solid var(--line); border-radius:8px; background:white; padding:4px 6px; }
+  input[type=color] { width:44px; height:30px; padding:2px; }
+  .colors { display:flex; flex-wrap:wrap; gap:6px; }
+  .btns { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+  button, .filebtn { border:1px solid var(--line); background:white; color:var(--ink); border-radius:10px; padding:8px 12px; font:inherit; cursor:pointer; }
+  button.primary { background:var(--leaf); color:white; border-color:var(--leaf); }
+  button.gold { background:#f2d38a; border-color:#f2d38a; }
+  input[type=file] { display:none; }
+  .hint { color:#8a7b6e; font-size:12px; margin-top:6px; }
+  @media (max-width:800px){ .layout{ grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<main class="layout">
+  <section class="stage">
+    <canvas id="game" width="400" height="600" aria-label="簪子解谜画面"></canvas>
+    <div class="status" id="status">准备就绪</div>
+    <div class="hint">拖动圆环旋转；把簪子转到顶部缺口后点击即可抽出。同色三支进入收纳槽即合成消除。</div>
+  </section>
+
+  <aside class="panel">
+    <h2>关卡结构</h2>
+    <div class="row"><label for="colorCount">颜色数量</label><input id="colorCount" type="range" min="2" max="6" value="4"><output id="colorCountOut">4</output></div>
+    <div class="row"><label for="pinsPerColor">每色簪子数</label>
+      <select id="pinsPerColor"><option value="3">3</option><option value="6" selected>6</option><option value="9">9</option></select></div>
+    <div class="row"><label for="trayCap">收纳槽容量</label><input id="trayCap" type="range" min="4" max="9" value="7"><output id="trayCapOut">7</output></div>
+    <div class="row"><label for="layers">堆叠层数</label><input id="layers" type="range" min="1" max="5" value="3"><output id="layersOut">3</output></div>
+    <div class="row"><label for="gap">麻将间隙式空隙(°)</label><input id="gap" type="range" min="0" max="12" value="6"><output id="gapOut">6</output></div>
+    <div class="row"><label for="offset">层间错位(°)</label><input id="offset" type="range" min="0" max="20" value="8"><output id="offsetOut">8</output></div>
+    <div class="hint">间隙和错位在下次“新关卡”或“自动解牌”时生效；间隙越大，上层簪子遮住下层的范围越小。</div>
+
+    <h2>簪子外形与材质</h2>
+    <div class="row"><label for="material">簪身材质</label>
+      <select id="material"><option value="gold">金属·金</option><option value="silver">金属·银</option><option value="jade">玉石</option><option value="lacquer">漆器</option><option value="pearl">珍珠</option></select></div>
+    <div class="row"><label for="headShape">簪头图案</label>
+      <select id="headShape"><option value="lotus">莲花</option><option value="ball">圆珠</option><option value="drop">水滴</option></select></div>
+    <div class="row"><label for="pinLength">簪子长度</label><input id="pinLength" type="range" min="50" max="140" value="95"><output id="pinLengthOut">95</output></div>
+    <div class="row"><label for="pinWidth">簪身粗细</label><input id="pinWidth" type="range" min="3" max="12" value="6"><output id="pinWidthOut">6</output></div>
+    <div class="row"><label>簪子颜色</label></div>
+    <div class="colors" id="colors"></div>
+
+    <h2>背景与特效</h2>
+    <div class="row"><label for="theme">背景主题</label>
+      <select id="theme"><option value="ink">水墨米色</option><option value="spring">春日粉绿</option><option value="night">夜色星幕</option></select></div>
+    <div class="row"><label for="effects">合成特效与粒子</label><input id="effects" type="checkbox" checked></div>
+    <div class="row"><label for="sfxOn">音效</label><input id="sfxOn" type="checkbox" checked></div>
+    <div class="row"><label for="sfxVol">音量</label><input id="sfxVol" type="range" min="0" max="100" value="60"><output id="sfxVolOut">60</output></div>
+    <div class="row"><label for="bgmOn">环境音乐</label><input id="bgmOn" type="checkbox"></div>
+
+    <h2>圆环与操作</h2>
+    <div class="row"><label for="ringRadius">圆环半径</label><input id="ringRadius" type="range" min="80" max="150" value="115"><output id="ringRadiusOut">115</output></div>
+    <div class="row"><label for="ringSpeed">自动旋转(°/秒)</label><input id="ringSpeed" type="range" min="0" max="90" value="0"><output id="ringSpeedOut">0</output></div>
+    <div class="row"><label for="gateTol">缺口判定宽度(°)</label><input id="gateTol" type="range" min="4" max="30" value="12"><output id="gateTolOut">12</output></div>
+    <div class="row"><label for="extractMs">抽出动画(ms)</label><input id="extractMs" type="range" min="150" max="900" value="420"><output id="extractMsOut">420</output></div>
+    <div class="row"><label for="solveSpeed">自动解牌旋转速度(°/秒)</label><input id="solveSpeed" type="range" min="60" max="720" value="300"><output id="solveSpeedOut">300</output></div>
+
+    <div class="btns">
+      <button id="newGame" class="primary">新关卡</button>
+      <button id="autoSolve" class="gold">自动解牌通关</button>
+      <button id="stopAuto">停止自动</button>
+    </div>
+
+    <h2>手指点击模拟</h2>
+    <div class="btns">
+      <label class="filebtn" for="fingerFile">上传手指轨迹 JSON</label>
+      <input id="fingerFile" type="file" accept="application/json,.json">
+      <button id="playFinger">▶ 回放手指</button>
+      <button id="recordBtn">● 开始录制</button>
+      <button id="exportRec">导出轨迹</button>
+    </div>
+    <div class="hint">轨迹格式：[{"t":毫秒,"type":"down|move|up","x":0~1,"y":0~1}, ...]，坐标为画面相对位置。</div>
+  </aside>
+</main>
+<script src="core.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
